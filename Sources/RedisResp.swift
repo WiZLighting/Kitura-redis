@@ -25,7 +25,7 @@ internal class RedisResp {
     ///
     /// Socket used to talk with the server
     private var socket: Socket?
-
+    
     // Mark: Prebuilt constant UTF8 strings (these strings are all proper UTF-8 strings)
     private static let asterisk = RedisString("*").asData
     private static let colon = RedisString(":").asData
@@ -33,12 +33,12 @@ internal class RedisResp {
     private static let dollar = RedisString("$").asData
     private static let minus = RedisString("-").asData
     private static let plus = RedisString("+").asData
-
+    
     ///
     /// State of connection
     ///
     internal private(set) var status = RedisRespStatus.notConnected
-
+    
     internal init(host: String, port: Int32) {
         do {
             socket = try Socket.create()
@@ -49,82 +49,86 @@ internal class RedisResp {
             status = .notConnected
         }
     }
-
+    
     internal func issueCommand(_ stringArgs: [String], callback: (RedisResponse) -> Void) {
         guard let socket = socket else { return }
-
-        var buffer = Data()
-        buffer.append(RedisResp.asterisk)
-        add(stringArgs.count, to: &buffer)
-        buffer.append(RedisResp.crLf)
-
-        for arg in stringArgs {
-            addAsBulkString(RedisString(arg).asData, to: &buffer)
-        }
-
-        do {
-            try socket.write(from: buffer)
-
-            readAndParseResponse(callback: callback)
-        }
-        catch let error as Socket.Error {
-            callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
-        }
-        catch {
-            callback(RedisResponse.Error("Error sending command to Redis server. Unknown error"))
+        autoreleasepool{
+            var buffer = Data()
+            buffer.append(RedisResp.asterisk)
+            add(stringArgs.count, to: &buffer)
+            buffer.append(RedisResp.crLf)
+            
+            for arg in stringArgs {
+                addAsBulkString(RedisString(arg).asData, to: &buffer)
+            }
+            
+            do {
+                try socket.write(from: buffer)
+                
+                readAndParseResponse(callback: callback)
+            }
+            catch let error as Socket.Error {
+                callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
+            }
+            catch {
+                callback(RedisResponse.Error("Error sending command to Redis server. Unknown error"))
+            }
         }
     }
-
+    
     internal func issueCommand(_ stringArgs: [RedisString], callback: (RedisResponse) -> Void) {
         guard let socket = socket else { return }
-
-        var buffer = Data()
-        buffer.append(RedisResp.asterisk)
-        add(stringArgs.count, to: &buffer)
-        buffer.append(RedisResp.crLf)
-
-        for arg in stringArgs {
-            addAsBulkString(arg.asData, to: &buffer)
-        }
-        
-        do {
-            try socket.write(from: buffer)
-
-            readAndParseResponse(callback: callback)
-        }
-        catch let error as Socket.Error {
-            callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
-        }
-        catch {
-            callback(RedisResponse.Error("Error sending command to Redis server. Unknown error."))
+        autoreleasepool{
+            var buffer = Data()
+            buffer.append(RedisResp.asterisk)
+            add(stringArgs.count, to: &buffer)
+            buffer.append(RedisResp.crLf)
+            
+            for arg in stringArgs {
+                addAsBulkString(arg.asData, to: &buffer)
+            }
+            
+            do {
+                try socket.write(from: buffer)
+                
+                readAndParseResponse(callback: callback)
+            }
+            catch let error as Socket.Error {
+                callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
+            }
+            catch {
+                callback(RedisResponse.Error("Error sending command to Redis server. Unknown error."))
+            }
         }
     }
-
+    
     // Mark: Parsing Functions
-
+    
     private func readAndParseResponse(callback: (RedisResponse) -> Void) {
-        var buffer = Data()
-        var offset = 0
-        var response: RedisResponse = RedisResponse.Nil
-
-        do {
-            (response, offset) = try parseByPrefix(&buffer, from: offset)
-            callback(response)
-        }
-        catch let error as Socket.Error {
-            callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
-        }
-        catch let error as RedisRespError {
-            callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
-        }
-        catch {
-            callback(RedisResponse.Error("Error reading from the Redis server. Unknown error"))
+        autoreleasepool{
+            var buffer = Data()
+            var offset = 0
+            var response: RedisResponse = RedisResponse.Nil
+            
+            do {
+                (response, offset) = try parseByPrefix(&buffer, from: offset)
+                callback(response)
+            }
+            catch let error as Socket.Error {
+                callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
+            }
+            catch let error as RedisRespError {
+                callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
+            }
+            catch {
+                callback(RedisResponse.Error("Error reading from the Redis server. Unknown error"))
+            }
         }
     }
-
+    
     private func parseByPrefix(_ buffer: inout Data, from: Int) throws -> (RedisResponse, Int) {
         var response: RedisResponse
-
+        
         var (matched, offset) = try compare(&buffer, at: from, with: RedisResp.plus)
         if  matched {
             (response, offset) = try parseSimpleString(&buffer, offset: offset)
@@ -158,7 +162,7 @@ internal class RedisResp {
         }
         return (response, offset)
     }
-
+    
     private func parseArray(_ buffer: inout Data, offset: Int) throws -> (RedisResponse, Int) {
         var (arrayLength, newOffset) = try parseIntegerValue(&buffer, offset: offset)
         var responses = [RedisResponse]()
@@ -174,7 +178,7 @@ internal class RedisResp {
             return (RedisResponse.Nil, newOffset)
         }
     }
-
+    
     private func parseBulkString(_ buffer: inout Data, offset: Int) throws -> (RedisResponse, Int) {
         let (strLen64, newOffset) = try parseIntegerValue(&buffer, offset: offset)
         if  strLen64 >= 0  {
@@ -194,7 +198,7 @@ internal class RedisResp {
             return (RedisResponse.Nil, newOffset)
         }
     }
-
+    
     private func parseError(_ buffer:  inout Data, offset: Int) throws -> (RedisResponse, Int) {
         let eos = try find(&buffer, from: offset, data: RedisResp.crLf)
         let data = buffer.subdata(in: offset..<eos)
@@ -205,12 +209,12 @@ internal class RedisResp {
         }
         return (RedisResponse.Error(str), length)
     }
-
+    
     private func parseInteger(_ buffer: inout Data, offset: Int) throws -> (RedisResponse, Int) {
         let (int, newOffset) = try parseIntegerValue(&buffer, offset: offset)
         return (RedisResponse.IntegerValue(int), newOffset)
     }
-
+    
     private func parseSimpleString(_ buffer: inout Data, offset: Int) throws -> (RedisResponse, Int) {
         let eos = try find(&buffer, from: offset, data: RedisResp.crLf)
         let data = buffer.subdata(in: offset..<eos)
@@ -221,9 +225,9 @@ internal class RedisResp {
         }
         return (RedisResponse.Status(str), length)
     }
-
+    
     // Mark: Parser helper functions
-
+    
     private func compare(_ buffer: inout Data, at offset: Int, with: Data) throws -> (Bool, Int) {
         while  offset+with.count >= buffer.count  {
             let length = try socket?.read(into: &buffer)
@@ -240,11 +244,11 @@ internal class RedisResp {
             return (false, offset)
         }
     }
-
+    
     private func find(_ buffer: inout Data, from: Int, data: Data) throws -> Int {
         var offset = from
         var notFound = true
-
+        
         while notFound {
             let range = buffer.range(of: data, options: [], in: offset..<buffer.count)
             if range != nil {
@@ -260,7 +264,7 @@ internal class RedisResp {
         }
         return offset
     }
-
+    
     private func parseIntegerValue(_ buffer: inout Data, offset: Int) throws -> (Int64, Int) {
         let eos = try find(&buffer, from: offset, data: RedisResp.crLf)
         let data = buffer.subdata(in: offset..<eos)
@@ -275,9 +279,9 @@ internal class RedisResp {
         }
         return (int, length)
     }
-
+    
     // Mark: helper functions
-
+    
     private func addAsBulkString(_ cString: Data, to buffer: inout Data) {
         buffer.append(RedisResp.dollar)
         add(cString.count, to: &buffer)
@@ -294,7 +298,7 @@ internal class RedisResp {
     private func add(_ text: String, to buffer: inout Data) {
         buffer.append(RedisString(text).asData)
     }
-
+    
 }
 
 private enum RedisRespErrorCode {
@@ -303,15 +307,15 @@ private enum RedisRespErrorCode {
 
 fileprivate struct RedisRespError: Error {
     fileprivate let code: RedisRespErrorCode
-
+    
     func description() -> String {
         switch(code) {
-            case .EOF:
-                return "Unexpected EOF while parsing the response from the server"
-            case .notInteger:
-                return "An integer value contained non-digit characters"
-            case .notUTF8:
-                return "A simple string or error message wasn't UTF-8 encoded"
+        case .EOF:
+            return "Unexpected EOF while parsing the response from the server"
+        case .notInteger:
+            return "An integer value contained non-digit characters"
+        case .notUTF8:
+            return "A simple string or error message wasn't UTF-8 encoded"
         }
     }
 }
