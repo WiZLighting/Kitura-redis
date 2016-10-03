@@ -52,78 +52,75 @@ internal class RedisResp {
     
     internal func issueCommand(_ stringArgs: [String], callback: (RedisResponse) -> Void) {
         guard let socket = socket else { return }
-        autoreleasepool{
-            var buffer = Data()
-            buffer.append(RedisResp.asterisk)
-            add(stringArgs.count, to: &buffer)
-            buffer.append(RedisResp.crLf)
-            
-            for arg in stringArgs {
-                addAsBulkString(RedisString(arg).asData, to: &buffer)
-            }
-            
-            do {
-                try socket.write(from: buffer)
-                
-                readAndParseResponse(callback: callback)
-            }
-            catch let error as Socket.Error {
-                callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
-            }
-            catch {
-                callback(RedisResponse.Error("Error sending command to Redis server. Unknown error"))
-            }
+        var buffer = Data()
+        buffer.append(RedisResp.asterisk)
+        add(stringArgs.count, to: &buffer)
+        buffer.append(RedisResp.crLf)
+        
+        for arg in stringArgs {
+            addAsBulkString(RedisString(arg).asData, to: &buffer)
         }
+        
+        do {
+            try socket.write(from: buffer)
+            
+            readAndParseResponse(callback: callback)
+        }
+        catch let error as Socket.Error {
+            callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
+        }
+        catch {
+            callback(RedisResponse.Error("Error sending command to Redis server. Unknown error"))
+        }
+        
     }
     
     internal func issueCommand(_ stringArgs: [RedisString], callback: (RedisResponse) -> Void) {
         guard let socket = socket else { return }
-        autoreleasepool{
-            var buffer = Data()
-            buffer.append(RedisResp.asterisk)
-            add(stringArgs.count, to: &buffer)
-            buffer.append(RedisResp.crLf)
-            
-            for arg in stringArgs {
-                addAsBulkString(arg.asData, to: &buffer)
-            }
-            
-            do {
-                try socket.write(from: buffer)
-                
-                readAndParseResponse(callback: callback)
-            }
-            catch let error as Socket.Error {
-                callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
-            }
-            catch {
-                callback(RedisResponse.Error("Error sending command to Redis server. Unknown error."))
-            }
+        var buffer = Data()
+        buffer.append(RedisResp.asterisk)
+        add(stringArgs.count, to: &buffer)
+        buffer.append(RedisResp.crLf)
+        
+        for arg in stringArgs {
+            addAsBulkString(arg.asData, to: &buffer)
         }
+        
+        do {
+            try socket.write(from: buffer)
+            
+            readAndParseResponse(callback: callback)
+        }
+        catch let error as Socket.Error {
+            callback(RedisResponse.Error("Error sending command to Redis server. Error=\(error.description)"))
+        }
+        catch {
+            callback(RedisResponse.Error("Error sending command to Redis server. Unknown error."))
+        }
+        
     }
     
     // Mark: Parsing Functions
     
     private func readAndParseResponse(callback: (RedisResponse) -> Void) {
-        autoreleasepool{
-            var buffer = Data()
-            var offset = 0
-            var response: RedisResponse = RedisResponse.Nil
-            
-            do {
-                (response, offset) = try parseByPrefix(&buffer, from: offset)
-                callback(response)
-            }
-            catch let error as Socket.Error {
-                callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
-            }
-            catch let error as RedisRespError {
-                callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
-            }
-            catch {
-                callback(RedisResponse.Error("Error reading from the Redis server. Unknown error"))
-            }
+        var buffer = Data()
+        var offset = 0
+        var response: RedisResponse = RedisResponse.Nil
+        
+        do {
+            (response, offset) = try parseByPrefix(&buffer, from: offset)
+            callback(response)
         }
+        catch let error as Socket.Error {
+            callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
+        }
+        catch let error as RedisRespError {
+            callback(RedisResponse.Error("Error reading from the Redis server. Error=\(error.description)"))
+        }
+        catch {
+            callback(RedisResponse.Error("Error reading from the Redis server. Unknown error"))
+        }
+        
     }
     
     private func parseByPrefix(_ buffer: inout Data, from: Int) throws -> (RedisResponse, Int) {
