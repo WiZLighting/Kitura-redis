@@ -27,12 +27,12 @@ internal class RedisResp {
     private var socket: Socket?
     
     // Mark: Prebuilt constant UTF8 strings (these strings are all proper UTF-8 strings)
-    private static let asterisk = RedisString("*").asData
-    private static let colon = RedisString(":").asData
-    private static let crLf = RedisString("\r\n").asData
-    private static let dollar = RedisString("$").asData
-    private static let minus = RedisString("-").asData
-    private static let plus = RedisString("+").asData
+    private static let asterisk = "*".data(using: .utf8)!
+    private static let colon = ":".data(using: .utf8)!
+    private static let crLf = "\r\n".data(using: .utf8)!
+    private static let dollar = "$".data(using: .utf8)!
+    private static let minus = "-".data(using: .utf8)!
+    private static let plus = "+".data(using: .utf8)!
     
     ///
     /// State of connection
